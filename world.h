@@ -38,7 +38,7 @@ struct Projectile {
   bool alive = true;
 
   static constexpr float speed = 100;
-  static constexpr float life_duration = 1;
+  static constexpr float life_duration = 0.75;
   static constexpr float radius = 0.1;
 };
 
@@ -52,9 +52,11 @@ struct Player {
 
   // Player(Body body): body(body) {}
 
-  constexpr static float shoot_delay = 0.02;
+  constexpr static float shoot_delay = 0.1;
   constexpr static float radius = 1;
   constexpr static float invincible_dur = 1;
+  constexpr static float turn_speed = 3;
+  constexpr static float acceleration = 30;
 };
 
 struct Asteroid {
@@ -76,7 +78,15 @@ struct World {
   std::vector<Projectile> projectiles;
   float time = 0;
 
+  World(Vec size_): size(size_) {
+    player.body.trans.pos = size / 2.0f;
+    for (int i = 0; i < 1; i++)
+      spawnRandomAsteroid();
+  }
+
   void shoot() {
+    if (player.lifes == 0)
+      return;
     if (time < player.last_shoot_t + player.shoot_delay)
       return;
     player.last_shoot_t = time;
@@ -97,8 +107,12 @@ struct World {
 
     float r = 4; //frand() * 5 + 5;
     
-    Vec pos{frand() * size.x, frand() * size.y};
-    Vec vel = Vec{frand(), 0} * Asteroid::maxSpeed;
+    Vec pos;
+    do {
+      pos = Vec{frand() * size.x, frand() * size.y};
+    } while ((pos - player.body.trans.pos).len() < 10);
+    
+    Vec vel = Vec{1, 0} * (frand() * 0.5 + 1) * Asteroid::maxSpeed;
     float rot = frand() * 3.1415;
     vel = vel.rotate(rot);
     asteroids.push_back(Asteroid{Body{{pos, rot}, vel}, r});
@@ -106,8 +120,13 @@ struct World {
 
   void step(float dt, int steer, int move) {
     time += dt;
-    player.body.vel += dt * Vec{1, 0}.rotate(player.body.trans.rot) * 30 * move;
-    player.body.trans.rot += dt * steer * 5;
+
+    // Player control
+
+    if (player.lifes > 0) {
+      player.body.vel += dt * Vec{1, 0}.rotate(player.body.trans.rot) * move * Player::acceleration;
+      player.body.trans.rot += dt * steer * Player::turn_speed;
+    }
 
     // Check projectiles for exiration
 
@@ -119,12 +138,16 @@ struct World {
 
     // Player-asteroid collision
 
-    if (!player.invincible) {
+    if (player.lifes == 0) {
+      // pass
+    } else if (!player.invincible) {
       for (Asteroid &asteroid : asteroids) {
         if (!asteroid.alive) continue;
         if ((player.body.trans.pos - asteroid.body.trans.pos).len() <= asteroid.radius + player.radius) {
           player.invincible = true;
           player.invincible_start = time;
+          player.lifes--;
+          player.body = Body{Transform{size / 2, pi/2}, Vec{0, 0}};
         }
       }
     } else if (time - player.invincible_start >= player.invincible_dur) {
@@ -183,9 +206,10 @@ struct World {
       projectiles.erase(new_end, projectiles.end());
     }
 
-    // Phystics move step
+    // Physics move step
 
-    player.body.step(dt), wrap(player.body);
+    if (player.lifes > 0)
+      player.body.step(dt), wrap(player.body);
     for (Asteroid &asteroid : asteroids)
       asteroid.body.step(dt), wrap(asteroid.body);
     for (Projectile &projectile : projectiles)

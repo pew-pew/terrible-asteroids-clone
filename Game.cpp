@@ -6,12 +6,15 @@
 #include <algorithm>
 #include <deque>
 #include <cmath>
+#include <optional>
 
 #include "geometry.h"
 #include "display.h"
 #include "world.h"
 
-World world;
+const Vec world_size = Vec{100, 100.0f * SCREEN_HEIGHT / SCREEN_WIDTH};
+World world(world_size);
+bool started = false;
 
 Vec w2s(Vec v) {
   Vec screen_size{SCREEN_WIDTH, SCREEN_HEIGHT};
@@ -27,9 +30,6 @@ float w2s(float x) {
 
 void initialize()
 {
-  world.size = Vec{100, 100.0f * SCREEN_HEIGHT / SCREEN_WIDTH};
-  world.player.body.trans.pos = world.size / 2.0f;
-  world.spawnRandomAsteroid();
 }
 
 void handleControls(int &rot, int& acc) {
@@ -46,12 +46,25 @@ void act(float dt)
   if (is_key_pressed(VK_ESCAPE))
     schedule_quit_game();
 
-  float t_bef = world.time;
-  float t_aft = world.time + dt;
-
-  if (round(t_bef * 5) != round(t_aft * 5)) {
-    world.spawnRandomAsteroid();
+  if (!started) {
+    if (is_key_pressed(VK_RETURN))
+      started = true;
+    else
+      return;
   }
+
+  if ((world.player.lifes == 0 || world.asteroids.empty())
+      && is_key_pressed(VK_RETURN))
+  {
+    world = World(world_size);
+  }
+
+  // float t_bef = world.time;
+  // float t_aft = world.time + dt;
+
+  // if (round(t_bef * 5) != round(t_aft * 5)) {
+  //   world.spawnRandomAsteroid();
+  // }
 
   if (is_key_pressed(VK_SPACE))
     world.shoot();
@@ -85,7 +98,13 @@ void drawShoot(Transform trans) {
 
 void drawAsteroid(const Asteroid &ast) {
   display::circle(display::Color{0, 125, 255}, w2s(ast.body.trans.pos), w2s(ast.radius));
-  display::circle(display::Color{0, 0, 255}, w2s(ast.body.trans.pos), w2s(ast.radius * 0.9));
+  display::circle(display::Color{0, 100, 200}, w2s(ast.body.trans.pos), w2s(ast.radius * 0.9));
+}
+
+void drawHearth(Vec pos) {
+  display::circle(display::Color{30, 30, 255}, pos + Vec{-10, -10}, 30);
+  display::circle(display::Color{30, 30, 255}, pos + Vec{+10, -10}, 30);
+  display::circle(display::Color{30, 30, 255}, pos + Vec{  0, +10}, 30);
 }
 
 void draw()
@@ -96,7 +115,28 @@ void draw()
     drawAsteroid(asteroid);
   for (auto &shoot : world.projectiles)
     drawShoot(shoot.body.trans);
-  drawPlayer(world.player);
+
+  if (world.player.lifes > 0)
+    drawPlayer(world.player);
+  
+  for (int i = 0; i < world.player.lifes; i++) {
+    drawHearth(Vec{100 + i * 100, 100});
+  }
+
+  if (world.player.lifes == 0) {
+    for (int i = 0; i < 6; i++)
+      display::rect(display::Color{200, 200, 200}, 200 + 100 * i, SCREEN_HEIGHT / 2, 70, 70);
+  }
+
+  if (world.asteroids.size() == 0) {
+    for (int i = 0; i < 6; i++)
+      display::rect(display::Color{200, 200, 0}, 200 + 100 * i, SCREEN_HEIGHT / 2, 70, 70);
+  }
+
+  if (!started) {
+    for (int i = 0; i < 6; i++)
+      display::rect(display::Color{0, 200, 200}, 200 + 100 * i, SCREEN_HEIGHT / 2, 70, 70);
+  }
 }
 
 void finalize()
