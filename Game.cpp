@@ -141,7 +141,8 @@ void draw()
   }
 
   if (!started) {
-    display::text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, "Press ENTER to start!", display::TextAlign::CENTER);
+    display::text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 20, "Arrows - move, space - shoot", display::TextAlign::CENTER);
+    display::text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20, "Press ENTER to start!", display::TextAlign::CENTER);
   }
 }
 
