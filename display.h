@@ -3,31 +3,32 @@
 #include <cassert>
 #include <utility>
 #include <algorithm>
+#include <string>
 
 #include "Engine.h"
 #include "geometry.h"
 
 namespace display {
   struct Color {
-    uint8_t b, g, r, _;
+    uint8_t b, g, r, a;
   };
 
-  bool onScreen(int x, int y) {
+  inline bool onScreen(int x, int y) {
     return (
          0 <= x && x < SCREEN_WIDTH
       && 0 <= y && y < SCREEN_HEIGHT
     );
   }
 
-  Color& at(int x, int y) {
+  inline Color& at(int x, int y) {
     assert(onScreen(x, y));
     return reinterpret_cast<Color&>(buffer[y][x]);
   }
 
-  int clip_x(int x) { return std::max(0, std::min(x, SCREEN_WIDTH  - 1)); }
-  int clip_y(int y) { return std::max(0, std::min(y, SCREEN_HEIGHT - 1)); }
+  inline int clip_x(int x) { return std::max(0, std::min(x, SCREEN_WIDTH  - 1)); }
+  inline int clip_y(int y) { return std::max(0, std::min(y, SCREEN_HEIGHT - 1)); }
 
-  void rect(Color color, int x0, int y0, int w, int h) {
+  inline void rect(Color color, int x0, int y0, int w, int h) {
     if (x0 + w <= 0 || x0 >= SCREEN_WIDTH) return;
     if (y0 + h <= 0 || y0 >= SCREEN_HEIGHT) return;
 
@@ -39,11 +40,11 @@ namespace display {
                 reinterpret_cast<uint32_t&>(color));
   }
 
-  void rect(Color color, float x0, float y0, float w, float h) {
+  inline void rect(Color color, float x0, float y0, float w, float h) {
     rect(color, (int)std::round(x0), (int)std::round(y0), (int)std::round(w), (int)std::round(h));
   }
 
-  void line(Color color, Vec p1, Vec p2) {
+  inline void line(Color color, Vec p1, Vec p2) {
     using std::abs, std::round, std::swap;
     if (abs(p1.x - p2.x) >= abs(p1.y - p2.y)) {
       if (p1.x > p2.x)
@@ -64,7 +65,7 @@ namespace display {
     }
   }
 
-  void circle(Color color, Vec p, float r) {
+  inline void circle(Color color, Vec p, float r) {
     using std::abs, std::round;
 
     int y0 = clip_y(std::floor(p.y - r));
@@ -86,6 +87,59 @@ namespace display {
 
       std::fill(&buffer[y][clip_x(x0)], &buffer[y][clip_x(x1)] + 1,
           reinterpret_cast<uint32_t&>(color));
+    }
+  }
+
+  struct Sprite {
+    std::vector<std::vector<Color>> grid;
+
+    int width()  const { return grid.front().size(); }
+    int height() const { return grid.size(); }
+    Color at(int x, int y) const { return grid[y][x]; }
+  };
+
+  Sprite string2sprite(std::string s, std::vector<Color> pallete);
+  extern Sprite hearth;
+  extern Sprite asteroid;
+  extern Sprite ascii_sprites[128];
+  constexpr int font_size = 32;
+
+  inline void sprite(int x0, int y0, int w, int h, const Sprite &sprite) {
+    for (int y = y0; y < y0 + h; y++)
+    for (int x = x0; x < x0 + w; x++) {
+      if (!onScreen(x, y)) continue;
+      int sx = std::round((float)(x - x0) / (w - 1) * (sprite.width() - 1));
+      int sy = std::round((float)(y - y0) / (h - 1) * (sprite.height() - 1));
+      assert(sx < sprite.width());
+      assert(sy < sprite.height());
+      if (sprite.at(sx, sy).a == 0)
+        at(x, y) = sprite.at(sx, sy);
+    }
+  }
+
+  enum class TextAlign {LEFT, CENTER, RIGHT};
+
+  inline void text(int x0, int y0, std::string s, TextAlign align = TextAlign::LEFT) {
+    if (align != TextAlign::LEFT) {
+      assert(s.find('\n') == std::string::npos);
+    }
+
+    if (align == TextAlign::CENTER) {
+      x0 -= s.size() * font_size / 2;
+    } else if (align == TextAlign::RIGHT) {
+      x0 -= s.size() * font_size;
+    }
+
+    int x = x0, y = y0;
+
+    for (char c : s) {
+      if (c == '\n') {
+        y += font_size;
+        x = x0;
+      } else {
+        sprite(x, y, font_size, font_size, ascii_sprites[c]);
+        x += font_size;
+      }
     }
   }
 };

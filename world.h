@@ -48,7 +48,7 @@ struct Player {
   bool invincible = false;
   float invincible_start = 0;
   int score = 0;
-  int lifes = 3;
+  int lives = 3;
 
   // Player(Body body): body(body) {}
 
@@ -78,14 +78,20 @@ struct World {
   std::vector<Projectile> projectiles;
   float time = 0;
 
-  World(Vec size_): size(size_) {
+  void resetPlayerPos() {
     player.body.trans.pos = size / 2.0f;
-    for (int i = 0; i < 1; i++)
+    player.body.trans.rot = pi/2;
+    player.body.vel = Vec{0, 0};
+  }
+
+  World(Vec size_): size(size_) {
+    resetPlayerPos();
+    for (int i = 0; i < 10; i++)
       spawnRandomAsteroid();
   }
 
   void shoot() {
-    if (player.lifes == 0)
+    if (player.lives == 0)
       return;
     if (time < player.last_shoot_t + player.shoot_delay)
       return;
@@ -123,7 +129,7 @@ struct World {
 
     // Player control
 
-    if (player.lifes > 0) {
+    if (player.lives > 0) {
       player.body.vel += dt * Vec{1, 0}.rotate(player.body.trans.rot) * move * Player::acceleration;
       player.body.trans.rot += dt * steer * Player::turn_speed;
     }
@@ -138,7 +144,7 @@ struct World {
 
     // Player-asteroid collision
 
-    if (player.lifes == 0) {
+    if (player.lives == 0) {
       // pass
     } else if (!player.invincible) {
       for (Asteroid &asteroid : asteroids) {
@@ -146,8 +152,9 @@ struct World {
         if ((player.body.trans.pos - asteroid.body.trans.pos).len() <= asteroid.radius + player.radius) {
           player.invincible = true;
           player.invincible_start = time;
-          player.lifes--;
-          player.body = Body{Transform{size / 2, pi/2}, Vec{0, 0}};
+          player.lives--;
+          player.score -= 100;
+          resetPlayerPos();
         }
       }
     } else if (time - player.invincible_start >= player.invincible_dur) {
@@ -166,6 +173,7 @@ struct World {
           proj.alive = false;
           asteroid.alive = false;
           asteroid.kill_dir = proj.body.vel;
+          player.score += 10;
           break;
         }
       }
@@ -182,8 +190,8 @@ struct World {
 
       b1.trans.pos += right * asteroid.radius / 2;
       b2.trans.pos -= right * asteroid.radius / 2;
-      b1.vel += right * asteroid.body.vel.len() / 2; // haha energy presetvation
-      b2.vel -= right * asteroid.body.vel.len() / 2;
+      b1.vel += right * asteroid.body.vel.len() * 2; // haha no energy presetvation
+      b2.vel -= right * asteroid.body.vel.len() * 2;
 
       new_ast.push_back(Asteroid{b1, asteroid.radius / 1.7f});
       new_ast.push_back(Asteroid{b2, asteroid.radius / 1.7f});
@@ -208,7 +216,7 @@ struct World {
 
     // Physics move step
 
-    if (player.lifes > 0)
+    if (player.lives > 0)
       player.body.step(dt), wrap(player.body);
     for (Asteroid &asteroid : asteroids)
       asteroid.body.step(dt), wrap(asteroid.body);

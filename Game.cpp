@@ -43,6 +43,7 @@ void handleControls(int &rot, int& acc) {
 
 void act(float dt)
 {
+  std::cout << 1/dt << std::endl;
   if (is_key_pressed(VK_ESCAPE))
     schedule_quit_game();
 
@@ -53,7 +54,7 @@ void act(float dt)
       return;
   }
 
-  if ((world.player.lifes == 0 || world.asteroids.empty())
+  if ((world.player.lives == 0 || world.asteroids.empty())
       && is_key_pressed(VK_RETURN))
   {
     world = World(world_size);
@@ -83,28 +84,32 @@ void drawPlayer(const Player &player) {
 
   Vec screen_size{SCREEN_WIDTH, SCREEN_HEIGHT};
 
-  display::Color c{255, 0, 255};
+  display::Color c{255, 200, 200};
   if (player.invincible) {
-    c = display::Color{0, 0, 255};
+    if ((int)(world.time / 0.1) % 2 == 0)
+      c = display::Color{0, 0, 255};
+    else
+      c = display::Color{0, 255, 255};
   }
+
   for (auto seg : lines) {
     display::line(c, w2s(player.body.trans.apply(seg.a)), w2s(player.body.trans.apply(seg.b)));
   }
 }
 
 void drawShoot(Transform trans) {
-  display::circle(display::Color{0, 0, 255}, w2s(trans.pos), w2s(Projectile::radius));
+  display::circle(display::Color{30, 255, 255}, w2s(trans.pos), w2s(Projectile::radius));
 }
 
-void drawAsteroid(const Asteroid &ast) {
-  display::circle(display::Color{0, 125, 255}, w2s(ast.body.trans.pos), w2s(ast.radius));
-  display::circle(display::Color{0, 100, 200}, w2s(ast.body.trans.pos), w2s(ast.radius * 0.9));
-}
+void drawAsteroid(const Asteroid &ast) {\
+  Vec p = w2s(ast.body.trans.pos);
+  float r = w2s(ast.radius);
 
-void drawHearth(Vec pos) {
-  display::circle(display::Color{30, 30, 255}, pos + Vec{-10, -10}, 30);
-  display::circle(display::Color{30, 30, 255}, pos + Vec{+10, -10}, 30);
-  display::circle(display::Color{30, 30, 255}, pos + Vec{  0, +10}, 30);
+  int x0 = p.x - r;
+  int y0 = p.y - r;
+  int w = r * 2;
+  int h = w;
+  display::sprite(x0, y0, w, h, display::asteroid);
 }
 
 void draw()
@@ -116,26 +121,33 @@ void draw()
   for (auto &shoot : world.projectiles)
     drawShoot(shoot.body.trans);
 
-  if (world.player.lifes > 0)
+  if (world.player.lives > 0)
     drawPlayer(world.player);
   
-  for (int i = 0; i < world.player.lifes; i++) {
-    drawHearth(Vec{100 + i * 100, 100});
+  for (int i = 0; i < world.player.lives; i++) {
+    display::sprite(50 + i * 100, 50, 80, 80, display::hearth);
   }
 
-  if (world.player.lifes == 0) {
-    for (int i = 0; i < 6; i++)
-      display::rect(display::Color{200, 200, 200}, 200 + 100 * i, SCREEN_HEIGHT / 2, 70, 70);
+  {
+    char score_str[6];
+    std::snprintf(score_str, 6, "%+05d", world.player.score);
+    if (world.player.score >= 0)
+      score_str[0] = ' '; // remove minus sign, i don't know printf specifiers
+    display::text(SCREEN_WIDTH, display::font_size, "Score: " + std::string(score_str) + " ", display::TextAlign::RIGHT);
+  }
+
+  if (world.player.lives == 0) {
+    display::text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 20, "Your ship has crashed!", display::TextAlign::CENTER);
+    display::text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20, "Press ENTER to restart!", display::TextAlign::CENTER);
   }
 
   if (world.asteroids.size() == 0) {
-    for (int i = 0; i < 6; i++)
-      display::rect(display::Color{200, 200, 0}, 200 + 100 * i, SCREEN_HEIGHT / 2, 70, 70);
+    display::text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 20, "Level cleared!", display::TextAlign::CENTER);
+    display::text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20, "Press ENTER to restart!", display::TextAlign::CENTER);
   }
 
   if (!started) {
-    for (int i = 0; i < 6; i++)
-      display::rect(display::Color{0, 200, 200}, 200 + 100 * i, SCREEN_HEIGHT / 2, 70, 70);
+    display::text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, "Press ENTER to start!", display::TextAlign::CENTER);
   }
 }
 
