@@ -10,8 +10,12 @@
 
 namespace display {
   struct Color {
-    uint8_t b, g, r, a;
+    uint8_t b, g, r, o; // yes, o stands for opacity, treated binary
   };
+
+  namespace colors {
+    constexpr Color sexyRed{0x36, 0x43, 0xf4};
+  }
 
   inline bool onScreen(int x, int y) {
     return (
@@ -91,6 +95,8 @@ namespace display {
   }
 
   struct Sprite {
+    static Sprite fromString(std::string s, std::vector<Color> pallete);
+
     std::vector<std::vector<Color>> grid;
 
     int width()  const { return grid.front().size(); }
@@ -98,11 +104,12 @@ namespace display {
     Color at(int x, int y) const { return grid[y][x]; }
   };
 
-  Sprite string2sprite(std::string s, std::vector<Color> pallete);
-  extern Sprite hearth;
-  extern Sprite asteroid;
-  extern Sprite ascii_sprites[128];
-  constexpr int font_size = 32;
+  namespace sprites {
+    extern Sprite hearth;
+    extern Sprite asteroids[3];
+    extern Sprite ascii[128];
+    constexpr int font_size = 32;
+  }
 
   inline void sprite(int x0, int y0, int w, int h, const Sprite &sprite) {
     for (int y = y0; y < y0 + h; y++)
@@ -112,7 +119,7 @@ namespace display {
       int sy = std::round((float)(y - y0) / (h - 1) * (sprite.height() - 1));
       assert(sx < sprite.width());
       assert(sy < sprite.height());
-      if (sprite.at(sx, sy).a == 0)
+      if (sprite.at(sx, sy).o == 0)
         at(x, y) = sprite.at(sx, sy);
     }
   }
@@ -121,24 +128,25 @@ namespace display {
 
   inline void text(int x0, int y0, std::string s, TextAlign align = TextAlign::LEFT) {
     if (align != TextAlign::LEFT) {
+      // I'm too lazy to align multiline strings
       assert(s.find('\n') == std::string::npos);
     }
 
     if (align == TextAlign::CENTER) {
-      x0 -= s.size() * font_size / 2;
+      x0 -= s.size() * sprites::font_size / 2;
     } else if (align == TextAlign::RIGHT) {
-      x0 -= s.size() * font_size;
+      x0 -= s.size() * sprites::font_size;
     }
 
     int x = x0, y = y0;
 
     for (char c : s) {
       if (c == '\n') {
-        y += font_size;
+        y += sprites::font_size;
         x = x0;
       } else {
-        sprite(x, y, font_size, font_size, ascii_sprites[c]);
-        x += font_size;
+        sprite(x, y, sprites::font_size, sprites::font_size, sprites::ascii[c]);
+        x += sprites::font_size;
       }
     }
   }

@@ -18,6 +18,10 @@ const double pi = std::acos(-1);
 struct Transform {
   Vec pos; float rot;
 
+  Vec getDir() {
+    return Vec{1, 0}.rotate(rot);
+  }
+
   Vec apply(Vec x) const {
     return pos + x.rotate(rot);
   }
@@ -50,7 +54,7 @@ struct Player {
   int score = 0;
   int lives = 3;
 
-  // Player(Body body): body(body) {}
+  bool alive() { return lives > 0; }
 
   constexpr static float shoot_delay = 0.1;
   constexpr static float radius = 1;
@@ -61,14 +65,20 @@ struct Player {
 
 struct Asteroid {
   Body body;
-
   float radius;
+  int color; // 0, 1, 2
 
   bool alive = true;
-  Vec kill_dir;
+  Vec hit_dir;
 
-  static constexpr float maxSpeed = 3;
-  static constexpr float minRadius = 1.5;
+  static constexpr float max_speed = 3;
+  static constexpr float min_radius = 1.5;
+};
+
+struct Input {
+  int move; // -1, 0, 1 - back, nothing, forward
+  int steer; // -1, 0, 1 - left, nothing, right
+  bool shoot;
 };
 
 struct World {
@@ -78,29 +88,27 @@ struct World {
   std::vector<Projectile> projectiles;
   float time = 0;
 
-  void resetPlayerPos() {
-    player.body.trans.pos = size / 2.0f;
-    player.body.trans.rot = pi/2;
-    player.body.vel = Vec{0, 0};
-  }
-
   World(Vec size_): size(size_) {
     resetPlayerPos();
     for (int i = 0; i < 10; i++)
       spawnRandomAsteroid();
   }
 
-  void shoot() {
-    if (player.lives == 0)
-      return;
+
+  void resetPlayerPos() {
+    player.body.trans.pos = size / 2.0f;
+    player.body.trans.rot = pi/2;
+    player.body.vel = Vec{0, 0};
+  }
+
+  void shootIfReady() {
     if (time < player.last_shoot_t + player.shoot_delay)
       return;
     player.last_shoot_t = time;
 
-    Transform trans = player.body.trans;
-    Vec vel = Vec{Projectile::speed, 0}.rotate(trans.rot) + player.body.vel;
+    Vec vel = player.body.trans.getDir() * Projectile::speed + player.body.vel;
     projectiles.push_back(
-      Projectile{Body{trans, vel}, time}
+      Projectile{Body{player.body.trans, vel}, time}
     );
   }
 
@@ -111,27 +119,30 @@ struct World {
   void spawnRandomAsteroid() {
     auto frand = []() { return (rand() % 1000) / 1000.0f; };
 
-    float r = 4; //frand() * 5 + 5;
-    
+    float r = frand() * 3 + 5;
+    int color = rand() % 3;
+
     Vec pos;
     do {
       pos = Vec{frand() * size.x, frand() * size.y};
-    } while ((pos - player.body.trans.pos).len() < 10);
+    } while ((pos - player.body.trans.pos).len() < r * 2 + player.radius);
     
-    Vec vel = Vec{1, 0} * (frand() * 0.5 + 1) * Asteroid::maxSpeed;
+    Vec vel = Vec{1, 0} * (frand() * 0.5 + 1) * Asteroid::max_speed;
     float rot = frand() * 3.1415;
     vel = vel.rotate(rot);
-    asteroids.push_back(Asteroid{Body{{pos, rot}, vel}, r});
+    asteroids.push_back(Asteroid{Body{{pos, rot}, vel}, r, color});
   }
 
-  void step(float dt, int steer, int move) {
+  void step(float dt, Input inp) {
     time += dt;
 
     // Player control
 
-    if (player.lives > 0) {
-      player.body.vel += dt * Vec{1, 0}.rotate(player.body.trans.rot) * move * Player::acceleration;
-      player.body.trans.rot += dt * steer * Player::turn_speed;
+    if (player.alive()) {
+      if (inp.shoot)
+        shootIfReady();
+      player.body.vel += dt * inp.move * Player::acceleration * player.body.trans.getDir();
+      player.body.trans.rot += dt * inp.steer * Player::turn_speed;
     }
 
     // Check projectiles for exiration
@@ -149,6 +160,7 @@ struct World {
     } else if (!player.invincible) {
       for (Asteroid &asteroid : asteroids) {
         if (!asteroid.alive) continue;
+
         if ((player.body.trans.pos - asteroid.body.trans.pos).len() <= asteroid.radius + player.radius) {
           player.invincible = true;
           player.invincible_start = time;
@@ -173,7 +185,7 @@ struct World {
         if ((proj.body.trans.pos - asteroid.body.trans.pos).len() <= asteroid.radius + Projectile::radius) {
           proj.alive = false;
           asteroid.alive = false;
-          asteroid.kill_dir = proj.body.vel;
+          asteroid.hit_dir = proj.body.vel;
           player.score += 10;
           break;
         }
@@ -182,25 +194,26 @@ struct World {
 
     // Split damaged asteroids 
 
-    std::vector<Asteroid> new_ast;
+    std::vector<Asteroid> debris;
     for (Asteroid &asteroid : asteroids) {
       if (asteroid.alive) continue;
-      if (asteroid.radius < Asteroid::minRadius) continue;
+      if (asteroid.radius / 1.7f < Asteroid::min_radius) continue;
+
       Body b1 = asteroid.body, b2 = asteroid.body;
-      Vec right = asteroid.kill_dir.normalized().rotate(-pi / 2);
+      Vec right = asteroid.hit_dir.normalized().rotate(-pi / 2);
 
       b1.trans.pos += right * asteroid.radius / 2;
       b2.trans.pos -= right * asteroid.radius / 2;
       b1.vel += right * asteroid.body.vel.len() * 2; // haha no energy presetvation
       b2.vel -= right * asteroid.body.vel.len() * 2;
 
-      new_ast.push_back(Asteroid{b1, asteroid.radius / 1.7f});
-      new_ast.push_back(Asteroid{b2, asteroid.radius / 1.7f});
+      debris.push_back(Asteroid{b1, asteroid.radius / 1.7f, asteroid.color});
+      debris.push_back(Asteroid{b2, asteroid.radius / 1.7f, asteroid.color});
     }
 
-    asteroids.insert(asteroids.end(), new_ast.begin(), new_ast.end());
+    asteroids.insert(asteroids.end(), debris.begin(), debris.end());
 
-    // Remove dead asteroids
+    // Remove dead asteroids and projectiles
 
     {
       auto new_end = std::remove_if(asteroids.begin(), asteroids.end(), [](Asteroid &ast) {
@@ -217,7 +230,7 @@ struct World {
 
     // Physics move step
 
-    if (player.lives > 0)
+    if (player.alive())
       player.body.step(dt), wrap(player.body);
     for (Asteroid &asteroid : asteroids)
       asteroid.body.step(dt), wrap(asteroid.body);

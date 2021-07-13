@@ -4,27 +4,7 @@
 
 namespace display {
 
-std::string normalize(std::string s) {
-  std::string normalized;
-  for (char c : s) {
-    switch (c) {
-      case ' ': 
-        break;
-      case '\n':
-        if (!normalized.empty() && normalized.back() != '\n')
-          normalized += '\n';
-        break;
-      default:
-        normalized += c;
-        break;
-    }
-  }
-  if (!normalized.empty() && normalized[-1] != '\n') normalized += '\n';
-  return normalized;
-}
-
-
-Sprite string2sprite(std::string s, std::vector<Color> pallete) {
+Sprite Sprite::fromString(std::string s, std::vector<Color> pallete) {
   Color bg{0, 0, 0, 1};
 
   std::vector<std::vector<Color>> lines(1);
@@ -36,23 +16,22 @@ Sprite string2sprite(std::string s, std::vector<Color> pallete) {
       lines.back().push_back(bg);
     else if ('0' <= c && c <= '9')
       lines.back().push_back(pallete.at(c - '0'));
-    else {
-      std::cout << '<' << c << '>' << std::endl;
+    else
       assert(false);
-    }
   }
   if (lines.back().empty())
     lines.pop_back();
 
   assert(!lines.empty());
   size_t sz = lines.front().size();
-  for (auto &line : lines) assert(line.size() == sz);
+  for (auto &line : lines)
+    assert(line.size() == sz);
 
   return Sprite{std::move(lines)};
 }
 
 
-std::string s = R"(
+std::string string_hearth = R"(
 .00...00.
 0000.0000
 000000000
@@ -62,10 +41,10 @@ std::string s = R"(
 ....0....
 )";
 
-Sprite hearth = string2sprite(s, {{0, 0, 255}});
+Sprite sprites::hearth = Sprite::fromString(string_hearth, {colors::sexyRed});
 
 
-std::string s_ast = R"(
+std::string string_asteroid = R"(
 ................
 .....0000000....
 ...11000110001..
@@ -75,15 +54,19 @@ std::string s_ast = R"(
 .11000110011000.
 .10000111010000.
 .00000010000000.
-.00100000000000.
-.01110000000000.
-.01111000001000.
-..0010000011101.
-...0000000110...
-.....0000001....
+.00100000000001.
+.01110000000011.
+.01111000001011.
+..001000001111..
+...0000001111...
+.....111111.....
 ................
 )";
 
-Sprite asteroid = string2sprite(s_ast, {{0, 100, 200}, {0, 50, 100}});
+Sprite sprites::asteroids[3] = {
+  Sprite::fromString(string_asteroid, {{0x41, 0x4c, 0x6d}, {0x23, 0x27, 0x3e}}),
+  Sprite::fromString(string_asteroid, {{0x00, 0x69, 0x5c}, {0x00, 0x4d, 0x40}}),
+  Sprite::fromString(string_asteroid, {{0x15, 0x43, 0xd8}, {0x0c, 0x36, 0xbf}}),
+};
 
 }
