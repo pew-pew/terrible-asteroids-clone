@@ -155,6 +155,7 @@ struct World {
           player.lives--;
           player.score -= 100;
           resetPlayerPos();
+          break;
         }
       }
     } else if (time - player.invincible_start >= player.invincible_dur) {
