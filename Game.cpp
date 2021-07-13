@@ -11,10 +11,13 @@
 #include "geometry.h"
 #include "display.h"
 #include "world.h"
+#include "background.h"
 
 const Vec world_size = Vec{100, 100.0f * SCREEN_HEIGHT / SCREEN_WIDTH};
 World world(world_size);
 bool started = false;
+
+StarrySky background;
 
 Vec world2screen(Vec v) {
   Vec screen_size{SCREEN_WIDTH, SCREEN_HEIGHT};
@@ -45,6 +48,8 @@ void act(float dt)
 {
   if (is_key_pressed(VK_ESCAPE))
     schedule_quit_game();
+
+  background.act(dt);
 
   if (!started) {
     if (is_key_pressed(VK_RETURN))
@@ -102,6 +107,8 @@ void drawAsteroid(const Asteroid &ast) {\
 void draw()
 {
   std::fill(&buffer[0][0], &buffer[0][0] + SCREEN_WIDTH * SCREEN_HEIGHT, 0);
+
+  background.draw();
 
   for (auto &asteroid : world.asteroids)
     drawAsteroid(asteroid);
